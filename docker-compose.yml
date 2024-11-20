@@ -1,0 +1,119 @@
+services:
+  database:
+    image: mysql
+    container_name: radash_database
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+    volumes:
+      - ./mysql_data:/var/lib/mysql
+    restart: always
+
+  freeradius:
+    image: "freeradius/freeradius-server:latest-alpine"
+    container_name: radash_freeradius
+    environment:
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - RADIUS_SECRET=${RADIUS_SECRET}
+    ports:
+      - "1812-1813:1812-1813/udp"
+    volumes:
+      - ./freeradius/raddb:/etc/freeradius
+    depends_on:
+      - database
+    restart: always
+
+  redis:
+    image: redis:alpine
+    container_name: radash_redis
+    ports:
+      - 6379:6379
+    restart: always
+
+  radius_reload:
+    image: python:alpine
+    container_name: radash_reload
+    build:
+      context: ./radius_reload
+      dockerfile: Dockerfile
+    volumes:
+      - ./radius_reload:/app
+    environment:
+      - DATABASE_HOST=database
+      - DATABASE_PORT=3306
+      - DATABASE_USER=${MYSQL_USER}
+      - DATABASE_PASSWORD=${MYSQL_PASSWORD}
+      - DATABASE_NAME=${MYSQL_DATABASE}
+    depends_on:
+      - database
+      - freeradius
+    restart: always
+
+  api:
+    image: node:alpine
+    container_name: radash_api
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+      target: ${NODE_ENV}
+    ports:
+      - "3009:3009"
+    volumes:
+      - ./api:/usr/src/app
+      - /usr/src/app/node_modules
+    environment:
+      - NODE_ENV=${NODE_ENV}
+      - RADIUS_SECRET=${RADIUS_SECRET}
+      - TIMEZONE_IANA=${TIMEZONE_IANA}
+      - TIMEZONE=${TIMEZONE}
+      - DATABASE_HOST=database
+      - DATABASE_PORT=3306
+      - DATABASE_USER=${MYSQL_USER}
+      - DATABASE_PASSWORD=${MYSQL_PASSWORD}
+      - DATABASE_NAME=${MYSQL_DATABASE}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - EMAIL_ADDRESS=${EMAIL_ADDRESS}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+      - EMAIL_HOST=${EMAIL_HOST}
+      - EMAIL_PORT=${EMAIL_PORT}
+      - AFRICAS_TALKING_API_KEY=${AFRICAS_TALKING_API_KEY}
+      - AFRICAS_TALKING_USERNAME=${AFRICAS_TALKING_USERNAME}
+      - AFRICAS_TALKING_SENDER_ID=${AFRICAS_TALKING_SENDER_ID}
+      - MPESA_CONSUMER_KEY=${MPESA_CONSUMER_KEY}
+      - MPESA_SECRET_KEY=${MPESA_SECRET_KEY}
+      - MPESA_PAYBILL=${MPESA_PAYBILL}
+      - MPESA_PASSKEY=${MPESA_PASSKEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - DASHBOARD_API_KEY=${DASHBOARD_API_KEY}
+      - DASHBOARD_URL=${DASHBOARD_URL}
+    depends_on:
+      - database
+      - redis
+    restart: always
+
+  dashboard:
+    image: node:alpine
+    container_name: radash_dashboard
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+      target: ${NODE_ENV}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./dashboard:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=${NODE_ENV}
+      - NEXT_PUBLIC_API_URL=http://api:3009
+      - API_KEY=${DASHBOARD_API_KEY}
+      - NEXTAUTH_SECRET=${JWT_SECRET}
+      - NEXTAUTH_URL=${DASHBOARD_URL}
+    depends_on:
+      - api
+    restart: always
