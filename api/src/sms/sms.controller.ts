@@ -1,34 +1,21 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
-import { SmsService } from './sms.service';
-import { CreateSmDto } from './dto/create-sm.dto';
-import { UpdateSmDto } from './dto/update-sm.dto';
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import { AdminGuard } from 'src/auth/admin.guard';
+import { SmsDto } from './dto/sms.dto';
 
 @Controller('sms')
+@UseGuards(AdminGuard)
 export class SmsController {
-  constructor(private readonly smsService: SmsService) {}
+  constructor(@InjectQueue('sms') private readonly smsQueue: Queue) {}
 
   @Post()
-  create(@Body() createSmDto: CreateSmDto) {
-    return this.smsService.create(createSmDto);
-  }
+  async send_message(@Body() smsDto: SmsDto) {
+    await this.smsQueue.add('send-sms', {
+      to: smsDto.phone_numbers,
+      message: smsDto.message,
+    });
 
-  @Get()
-  findAll() {
-    return this.smsService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.smsService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateSmDto: UpdateSmDto) {
-    return this.smsService.update(+id, updateSmDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.smsService.remove(+id);
+    return { message: 'SMS has been queued successfully' };
   }
 }

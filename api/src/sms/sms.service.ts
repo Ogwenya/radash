@@ -1,26 +1,27 @@
 import { Injectable } from '@nestjs/common';
-import { CreateSmDto } from './dto/create-sm.dto';
-import { UpdateSmDto } from './dto/update-sm.dto';
+import * as AfricasTalking from 'africastalking';
 
 @Injectable()
 export class SmsService {
-  create(createSmDto: CreateSmDto) {
-    return 'This action adds a new sm';
+  private africasTalking: any;
+
+  constructor() {
+    this.africasTalking = AfricasTalking({
+      apiKey: process.env.AFRICAS_TALKING_API_KEY,
+      username: process.env.AFRICAS_TALKING_USERNAME,
+    });
   }
 
-  findAll() {
-    return `This action returns all sms`;
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} sm`;
-  }
-
-  update(id: number, updateSmDto: UpdateSmDto) {
-    return `This action updates a #${id} sm`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} sm`;
+  async send_message(to: string[], message: string): Promise<any> {
+    try {
+      const result = await this.africasTalking.SMS.send({
+        to,
+        message,
+        from: process.env.AFRICAS_TALKING_SENDER_ID,
+      });
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to send SMS: ${error.message}`);
+    }
   }
 }
