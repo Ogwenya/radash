@@ -4,9 +4,9 @@ WORKDIR /app
 
 COPY package*.json ./
 
-COPY . .
-
 RUN npm ci
+
+COPY . .
 
 EXPOSE 3000
 
@@ -20,9 +20,9 @@ WORKDIR /app
 
 COPY package*.json ./
 
-COPY  . .
-
 RUN npm ci
+
+COPY  . .
 
 RUN npm run build
 

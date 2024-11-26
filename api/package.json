@@ -40,6 +40,7 @@
     "class-validator": "^0.14.1",
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.13",
+    "express-basic-auth": "^1.2.1",
     "moment-timezone": "^0.5.46",
     "mysql2": "^3.11.4",
     "ping": "^0.4.4",
