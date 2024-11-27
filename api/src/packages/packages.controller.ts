@@ -1,15 +1,25 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+} from '@nestjs/common';
 import { PackagesService } from './packages.service';
-import { CreatePackageDto } from './dto/create-package.dto';
-import { UpdatePackageDto } from './dto/update-package.dto';
+import { AdminGuard } from 'src/auth/admin.guard';
+import { PackageDto } from './dto/package.dto';
 
 @Controller('packages')
+@UseGuards(AdminGuard)
 export class PackagesController {
   constructor(private readonly packagesService: PackagesService) {}
 
   @Post()
-  create(@Body() createPackageDto: CreatePackageDto) {
-    return this.packagesService.create(createPackageDto);
+  create(@Body() packageDto: PackageDto) {
+    return this.packagesService.create(packageDto);
   }
 
   @Get()
@@ -23,8 +33,8 @@ export class PackagesController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePackageDto: UpdatePackageDto) {
-    return this.packagesService.update(+id, updatePackageDto);
+  update(@Param('id') id: string, @Body() packageDto: PackageDto) {
+    return this.packagesService.update(+id, packageDto);
   }
 
   @Delete(':id')
