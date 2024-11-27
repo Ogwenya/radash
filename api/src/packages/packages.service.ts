@@ -30,6 +30,36 @@ export class PackagesService {
     return mbps * 1048576;
   }
 
+  // ##################################################
+  // ########## CONFIRM PACKAGE IN RIGHT GROUP ##########
+  // ####################################################
+  async confirm_package_is_of_right_type(
+    client_type: 'PPPoE' | 'Hotspot',
+    package_name: string,
+  ) {
+    try {
+      const package_exist = await this.packageRepository.findOneBy({
+        name: package_name,
+      });
+
+      if (!package_exist) {
+        throw new BadRequestException(
+          `Package ${package_name} does not exist.`,
+        );
+      }
+
+      if (package_exist.package_type !== client_type) {
+        throw new BadRequestException(
+          `Selected Package is not for ${client_type} users`,
+        );
+      }
+
+      return package_exist;
+    } catch (error) {
+      throw new HttpException(error.message, error.status || 500);
+    }
+  }
+
   // ####################################
   // ########## CREATE PACKAGE ##########
   // ####################################

@@ -198,6 +198,107 @@ export class AccountingService {
     }
   }
 
+  // ###################################################
+  // ########## GET CLIENT USAGE PER DURATION ##########
+  // ###################################################
+  async get_client_usage_per_duration(
+    username: string,
+    startDate: Date,
+    endDate: Date,
+    duration: 'minutes' | 'hours' | 'days' | 'weeks' | 'months',
+  ) {
+    const timezone = process.env.TIMEZONE;
+    let groupBy: string;
+
+    if (duration === 'minutes' || duration === 'hours') {
+      groupBy = `DATE_FORMAT(CONVERT_TZ(radacct.acctstarttime, '+00:00', :timezone), '%Y-%m-%d %H:00:00')`;
+    } else {
+      groupBy = `DATE(CONVERT_TZ(radacct.acctstarttime, '+00:00', :timezone))`;
+    }
+
+    const bandwidthUsage = await this.radAcctRepository
+      .createQueryBuilder('radacct')
+      .select(`${groupBy} AS period`)
+      .addSelect('SUM(radacct.acctinputoctets)', 'total_upload')
+      .addSelect('SUM(radacct.acctoutputoctets)', 'total_download')
+      .where('radacct.username = :username', { username })
+      .andWhere('radacct.acctstarttime BETWEEN :startDate AND :endDate', {
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+      })
+      .groupBy('period')
+      .setParameter('timezone', timezone)
+      .orderBy('period', 'ASC')
+      .getRawMany();
+
+    if (duration === 'days' || duration === 'weeks' || duration === 'months') {
+      return this.format_bandwidth_by_date(bandwidthUsage, startDate, endDate);
+    } else {
+      return this.format_bandwidth_by_hour(bandwidthUsage, startDate);
+    }
+  }
+
+  // #######################################
+  // ########## GET USER SESSIONS ##########
+  // #######################################
+  async get_user_sessions(
+    username: string,
+    startDate: Date,
+    endDate: Date,
+    duration: 'minutes' | 'hours' | 'days' | 'weeks' | 'months',
+  ) {
+    const timezone = process.env.TIMEZONE;
+    let groupBy: string;
+
+    if (duration === 'minutes' || duration === 'hours') {
+      groupBy = `DATE_FORMAT(CONVERT_TZ(radacct.acctstarttime, '+00:00', :timezone), '%Y-%m-%d %H:00:00')`;
+    } else {
+      groupBy = `DATE(CONVERT_TZ(radacct.acctstarttime, '+00:00', :timezone))`;
+    }
+
+    const sessions = await this.radAcctRepository
+      .createQueryBuilder('radacct')
+      .select(`${groupBy} AS period`)
+      .addSelect('COUNT(*)', 'sessionCount')
+      .where('radacct.username = :username', { username })
+      .andWhere('radacct.acctstarttime BETWEEN :startDate AND :endDate', {
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+      })
+      .groupBy('period')
+      .setParameter('timezone', timezone)
+      .orderBy('period', 'ASC')
+      .getRawMany();
+
+    let session_count;
+
+    if (duration === 'days' || duration === 'weeks' || duration === 'months') {
+      session_count = this.format_sessions_by_date(
+        sessions,
+        startDate,
+        endDate,
+      );
+    } else {
+      session_count = this.format_sessions_by_hour(sessions, startDate);
+    }
+
+    const active_sessions_count = await this.radAcctRepository.count({
+      where: { username, acctstoptime: null },
+    });
+
+    const sessions_details = sessions.map((session) => ({
+      sessionId: session.acctsessionid,
+      startTime: session.acctstarttime,
+      stopTime: session.acctstoptime,
+      duration: session.acctsessiontime || 0,
+      inputOctets: convert_bytes_to_gb(session.acctinputoctets || 0),
+      outputOctets: convert_bytes_to_gb(session.acctoutputoctets || 0),
+      ipAddress: session.framedipaddress || '',
+    }));
+
+    return { active_sessions_count, session_count, sessions_details };
+  }
+
   // ############################################
   // ########## FORMAT SESSION BY HOUR ##########
   // ############################################
